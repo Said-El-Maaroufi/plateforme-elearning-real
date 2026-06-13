@@ -1,0 +1,3 @@
+accept = 'image/*'
+accept = '.pdf'
+multiple pour uplodé plusieurs avec reste click sur ctrl
