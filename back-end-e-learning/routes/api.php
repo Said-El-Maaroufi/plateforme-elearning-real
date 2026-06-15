@@ -17,6 +17,7 @@ Route::get('/user', function () {
 
 // courses crud
 Route::post('/ajouter', [CourseController::class, 'ajouter']);
+Route::get('/index', [CourseController::class, 'index']);
 
 
 // Routes publiques — pas de token nécessaire 

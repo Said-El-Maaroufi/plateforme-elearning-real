@@ -10,7 +10,7 @@ class Course extends Model
 {
     //
 
-    protected $fillable = ['title', 'image', 'videos', 'description'];
+    protected $fillable = ['title', 'image', 'description'];
 
     public function users(): BelongsToMany{
         return $this->belongsToMany(User::class);
