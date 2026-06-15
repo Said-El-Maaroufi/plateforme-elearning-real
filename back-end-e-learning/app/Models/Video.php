@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Video extends Model
 {
     //
-    protected $fillable = ['file', 'time', 'course_id' ];
+    protected $fillable = ['title', 'file', 'course_id', 'duree_en_seconde', 'order' ];
 
-    public function course(){
+    public function course(): BelongsTo{
         return $this->belongsTo(Course::class);
     }
 }

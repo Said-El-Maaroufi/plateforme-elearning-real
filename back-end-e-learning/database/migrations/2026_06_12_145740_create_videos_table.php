@@ -13,9 +13,11 @@ return new class extends Migration
     {
         Schema::create('videos', function (Blueprint $table) {
             $table->id();
-            $table->string('file');
+            $table->string('title');
+            $table->text('file');
             $table->foreignId('course_id')->constrained('courses')->onDelete('cascade');
-            $table->time('time');
+            $table->integer('duree_en_seconde')->default(0);
+            $table->integer('order')->default(1);
             $table->timestamps();
         });
     }
