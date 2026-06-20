@@ -19,6 +19,8 @@ Route::get('/user', function () {
 Route::post('/ajouter', [CourseController::class, 'ajouter']);
 Route::get('/index', [CourseController::class, 'index']);
 Route::get('/course/{id}', [CourseController::class, 'show']);
+Route::get('/course/{id}/edit', [CourseController::class, 'showEdit']);
+Route::delete('/course/{id}', [CourseController::class, 'delete']);
 Route::put('/course/{id}/edit', [CourseController::class, 'edit']);
 
 
