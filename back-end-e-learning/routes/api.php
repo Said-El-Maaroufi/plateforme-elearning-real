@@ -16,13 +16,17 @@ Route::get('/user', function () {
 
 
 // courses crud
-Route::post('/ajouter', [CourseController::class, 'ajouter']);
-Route::get('/index', [CourseController::class, 'index']);
-Route::get('/course/{id}', [CourseController::class, 'show']);
-Route::get('/course/{id}/edit', [CourseController::class, 'showEdit']);
-Route::delete('/course/{id}', [CourseController::class, 'delete']);
-Route::put('/course/{id}/edit', [CourseController::class, 'edit']);
+Route::middleware(['auth:sanctum', 'admin'])->group(function(){
 
+    Route::post('/ajouter', [CourseController::class, 'ajouter']);
+    Route::get('/index', [CourseController::class, 'index']);
+    Route::get('/course/{id}', [CourseController::class, 'show']);
+    Route::get('/course/{id}/edit', [CourseController::class, 'showEdit']);
+    Route::delete('/course/{id}', [CourseController::class, 'delete']);
+    Route::put('/course/{id}/edit', [CourseController::class, 'edit']);
+    Route::get('/users', [userController::class, 'index']);
+    
+    });
 
 // Routes publiques — pas de token nécessaire 
 Route::post('/register', [AuthController::class, 'register']); 
@@ -30,15 +34,16 @@ Route::post('/login',    [AuthController::class, 'login']);
 
 
 
-Route::get('/users', [AuthController::class, 'users'])->middleware(['auth:sanctum', 'admin']);
-Route::get('/accee/{id}', [AuthController::class, 'show']);
 
 
 // Routes protégées — token obligatoire
-Route::middleware('auth:sanctum')->group(function () { 
-    Route::get('/courses', [AuthController::class, 'courses']);
-    Route::get('/logout', [AuthController::class, 'logout']);
-});
+
+Route::middleware("auth:sanctum")->group(function(){
+
+    Route::get('/courses', [CourseController::class, 'courses']);
+    Route::get('/cour/{id}', [CourseController::class, 'getCourseWithVideos']);
+    });
+
 
 
 

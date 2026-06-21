@@ -14,12 +14,16 @@ class AdminMiddleware
      *
      * @param  Closure(Request): (Response)  $next
      */
-    public function handle(Request $request, Closure $next): Response
+   public function handle(Request $request, Closure $next): Response
     {
-        
-        if(Auth::user()->role != "admin"){
-            return response()->json(['message' => 'acees refuse'], 403);
+        // 1. On vérifie si l'utilisateur est connecté et si son rôle est bien admin
+        if ($request->user() && $request->user()->role === 'admin') {
+            return $next($request);
         }
-        return $next($request);
+
+        // 2. Si ce n'est pas un admin, on renvoie une erreur 403 (Interdit) au format JSON pour React
+        return response()->json([
+            'message' => 'Accès refusé. Vous devez être administrateur.'
+        ], 403);
     }
 }

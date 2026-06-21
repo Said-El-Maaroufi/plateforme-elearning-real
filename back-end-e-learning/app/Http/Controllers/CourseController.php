@@ -245,4 +245,23 @@ class CourseController extends Controller
         $course->delete();
         return response()->json(["message" => "le cour a ete supprimer avec succes"]);
     }
+
+
+    public function getCourseWithVideos($id) {
+    // On récupère le cours par son ID avec ses vidéos associées
+    // (Remplace 'videos' par le nom de ta relation dans le modèle Course)
+    $course = Course::with('videos')->find($id);
+
+    if (!$course) {
+        return response()->json(['message' => 'Cours non trouvé'], 404);
+    }
+
+    return response()->json($course);
+}
+
+  public function courses(){
+    // Le "with('students')" charge automatiquement les utilisateurs inscrits à ce cours
+    $courses = Course::all();
+    return response()->json($courses);
+}
 }
