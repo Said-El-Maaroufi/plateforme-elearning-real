@@ -247,16 +247,32 @@ class CourseController extends Controller
     }
 
 
-    public function getCourseWithVideos($id) {
-    // On récupère le cours par son ID avec ses vidéos associées
-    // (Remplace 'videos' par le nom de ta relation dans le modèle Course)
-    $course = Course::with('videos')->find($id);
+   public function showCourseWorkspace($courseId)
+{
+    $user = auth()->user(); // 🔥 Récupère l'utilisateur connecté via le Token Sanctum
+
+    // 1. Trouver le cours avec ses vidéos
+    $course = Course::with('videos')->find($courseId);
 
     if (!$course) {
-        return response()->json(['message' => 'Cours non trouvé'], 404);
+        return response()->json(['message' => 'Cours non trouvé.'], 404);
     }
 
-    return response()->json($course);
+    // 2. Sécurité : Si l'utilisateur n'est pas Admin, on vérifie s'il est inscrit à ce cours
+    if ($user->role !== 'admin' && !$user->is_admin) {
+        
+        // Vérifie si l'ID du cours est présent dans la relation pivot de l'étudiant
+        $hasAccess = $user->courses()->where('course_id', $courseId)->exists();
+
+        if (!$hasAccess) {
+            return response()->json([
+                'message' => '🔒 Accès refusé. Vous n\'êtes pas inscrit à cette formation.'
+            ], 403); // Code 403: Forbidden (Interdit)
+        }
+    }
+
+    // 3. Si tout est OK (Admin ou inscrit), on renvoie les données
+    return response()->json($course, 200);
 }
 
   public function courses(){

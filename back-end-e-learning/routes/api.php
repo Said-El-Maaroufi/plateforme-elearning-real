@@ -26,6 +26,8 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function(){
     Route::put('/course/{id}/edit', [CourseController::class, 'edit']);
     Route::get('/users', [userController::class, 'index']);
     Route::get('/user/{id}', [userController::class, 'show']);
+    Route::get('/accee/{id}', [userController::class, 'getAccee']);
+    Route::post('/accee/update', [userController::class, 'updateAccee']);
     
     });
 
@@ -42,7 +44,7 @@ Route::post('/login',    [AuthController::class, 'login']);
 Route::middleware("auth:sanctum")->group(function(){
 
     Route::get('/courses', [CourseController::class, 'courses']);
-    Route::get('/cour/{id}', [CourseController::class, 'getCourseWithVideos']);
+    Route::get('/cour/{courseId}', [CourseController::class, 'showCourseWorkspace']);
     });
 
 
