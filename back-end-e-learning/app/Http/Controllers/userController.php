@@ -23,7 +23,7 @@ class userController extends Controller
     public function index()
     {
         //
-        $users = User::all();
+        $users = User::where('role', '!=', 'admin')->get();
         return response()->json(['users' => $users]);
     }
 
@@ -95,6 +95,20 @@ class userController extends Controller
         
 
 
+    }
+
+    public function show($id) {
+
+        $user = User::with('courses')->find($id);
+
+    if (!$user) {
+        return response()->json(['message' => 'Utilisateur non trouvé'], 404);
+    }
+
+    return response()->json([
+        'user' => $user,
+        'courses' => $user->courses // Liste des cours où l'utilisateur est inscrit
+    ], 200);
     }
 
     /**
