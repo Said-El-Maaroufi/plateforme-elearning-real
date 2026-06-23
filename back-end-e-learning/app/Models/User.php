@@ -49,8 +49,13 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+    
     public function courses(): BelongsToMany{
         return $this->belongsToMany(Course::class);
+    }
+
+    public function isSuperAdmin(): bool{
+        return $this->role === 'super_admin';
     }
 };
 

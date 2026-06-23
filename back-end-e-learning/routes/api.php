@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\userController;
+use App\Http\Middleware\CheckSuperAdmin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -46,6 +47,19 @@ Route::middleware("auth:sanctum")->group(function(){
     Route::get('/courses', [CourseController::class, 'courses']);
     Route::get('/cour/{courseId}', [CourseController::class, 'showCourseWorkspace']);
     });
+    
+
+    // reserver au super admin
+
+Route::middleware(['auth:sanctum','super_admin'])->group(function () {
+    // Toutes les routes ici sont ultra-sécurisées
+    Route::post('/superadmin/prof', [userController::class, 'createProf']);
+    Route::delete('/superadmin/prof/{id}', [userController::class, 'deleteProf']);
+    Route::get('/superadmin/profs', [UserController::class, 'getProfs']);
+    Route::get('/superadmin/prof/{id}', [UserController::class, 'getProf']);
+    // Route::get('/superadmin/global-stats', [DashboardController::class, 'globalStats']);
+
+});
 
 
 

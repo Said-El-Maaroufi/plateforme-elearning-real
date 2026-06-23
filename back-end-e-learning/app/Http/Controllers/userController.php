@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Auth as FacadesAuth;
 use Illuminate\Support\Facades\Auth as SupportFacadesAuth;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 use function Laravel\Prompts\error;
 
@@ -154,13 +156,32 @@ class userController extends Controller
             'courses' => $user->courses // Liste des cours où l'utilisateur est inscrit
         ], 200);
     }
+// ____________________________________________________________________________________________________________________________________________________________
+    // -----------------------------------pour le super Admin----------------------------------------------------------------------------------------
+    // ____________________________________________________________________________________________________________________________________________________________
+    public function createProf(Request $request){
+        $validate = $request->validate([
+            'name' => 'required|string|min:3',
+            'email' => 'email|required|unique:users,email',
+        ]);
+        $generatedPass = Str::random(10);
+        
+        
 
-    /**
-     * Display the specified resource.
-     */
+        User::create([
+            'name' => $validate['name'],
+            'email' => $validate['email'],
+            'password' => Hash::make($generatedPass),
+            'role' => 'admin'
+        ]);
 
+        return response()->json([
+            'message' => 'Le professeur a été créé avec succès',
+            'credentials' => [
+                'email' => $validate['email'],
+                'password' => $generatedPass
+            ]
+            ], 201);
 
-    /**
-     * Show the form for editing the specified resource.
-     */
+    }
 }
