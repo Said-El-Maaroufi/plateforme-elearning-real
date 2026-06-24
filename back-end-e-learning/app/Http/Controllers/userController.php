@@ -106,14 +106,14 @@ class userController extends Controller
 
         $user = Auth::user();
         $token = $user->createToken('auth_token')->plainTextToken;
-        return response()->json(['user' => $user, 'token' => $token, 'msg' => 'tu as ete bien connecter']);
+        return response()->json(['token' => $token]);
     }
 
     //POST api/logout
     public function logout(Request $request)
     {
         $request->user()->tokens()->delete();
-        return response()->json(['message', 'deconnecter']);
+        return response()->json(['message'=>'vous avez bien deconnecter']);
     }
 
     //POST api/register
@@ -137,7 +137,6 @@ class userController extends Controller
         //connecte automatique sans verifier le password
 
         return response()->json([
-            "msg" => "le compte a été creer avec succees",
             "token" => $token
         ], 201);
     }
@@ -176,7 +175,6 @@ class userController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Le professeur a été créé avec succès',
             'credentials' => [
                 'email' => $validate['email'],
                 'password' => $generatedPass

@@ -33,8 +33,8 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function(){
     });
 
 // Routes publiques — pas de token nécessaire 
-Route::post('/register', [AuthController::class, 'register']); 
-Route::post('/login',    [AuthController::class, 'login']);
+Route::post('/register', [userController::class, 'register']); 
+Route::post('/login',    [userController::class, 'login']);
 
 
 
@@ -43,9 +43,10 @@ Route::post('/login',    [AuthController::class, 'login']);
 // Routes protégées — token obligatoire
 
 Route::middleware("auth:sanctum")->group(function(){
-
+    
     Route::get('/courses', [CourseController::class, 'courses']);
     Route::get('/cour/{courseId}', [CourseController::class, 'showCourseWorkspace']);
+    Route::post('/logout',    [userController::class, 'logout']);
     });
     
 
