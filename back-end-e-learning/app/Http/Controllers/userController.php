@@ -29,7 +29,7 @@ class userController extends Controller
         return response()->json(['users' => $users]);
     }
 
-    public function getAccee($id)
+    public function   getAccee($id)
     {
         $user = User::find($id);
         if (!$user) {

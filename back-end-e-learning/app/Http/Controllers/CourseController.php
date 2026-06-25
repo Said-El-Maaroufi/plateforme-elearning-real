@@ -25,7 +25,7 @@ class CourseController extends Controller
 
             // validation de video
             'videos' => 'required|array|min:1',
-            'videos.*' => 'file|mimes:mp4,mov,avi|max:20480',
+            'videos.*' => 'file|mimes:mp4,mov,avi|max:512000',
         ]);
 
         if ($request->hasFile('image')) {
