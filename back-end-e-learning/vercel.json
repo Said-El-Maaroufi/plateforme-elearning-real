@@ -1,8 +1,9 @@
 {
     "version": 2,
+    "installCommand": "echo 'No install needed'",
     "functions": {
         "api/index.php": {
-            "runtime": "vercel-php"
+            "runtime": "vercel-php@0.8.0"
         }
     },
     "routes": [
