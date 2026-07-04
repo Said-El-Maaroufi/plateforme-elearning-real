@@ -1,13 +1,12 @@
 import axios from "axios";
 
 const api = axios.create({
-
-    baseURL: "http://127.0.0.1:8000/api",
+    // Vite va remplacer automatiquement cette variable par la bonne URL
+    baseURL: import.meta.env.VITE_API_BASE_URL,
 
     headers: {
         Accept: "application/json",
     }
-
 });
 
 export default api;
