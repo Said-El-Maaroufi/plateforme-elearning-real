@@ -1,6 +1,6 @@
-FROM php:8.2-fpm
+FROM php:8.2-apache
 
-# Installer les dépendances système et les extensions PHP requises pour Laravel
+# 1. Installer les dépendances système nécessaires
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -12,15 +12,35 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo_mysql gd
 
-# Installer Composer
+# 2. Activer le module de réécriture d'Apache (indispensable pour les routes Laravel)
+RUN a2enmod rewrite
+
+# 3. Changer le dossier racine d'Apache pour pointer vers le dossier "public" de Laravel
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/sites-available/*.conf
+
+# 4. Définir le dossier de travail officiel d'Apache
+WORKDIR /var/www/html
+
+# 5. Installer Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www
-
-# Copier le projet
+# 6. Copier les fichiers du projet Laravel
 COPY . .
 
-# Installer les dépendances Laravel
+# 7. Donner les bonnes permissions aux dossiers de stockage (sinon Laravel va crasher)
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+# 8. Installer les dépendances Composer sans les outils de dev
 RUN composer install --no-dev --optimize-autoloader
 
-CMD php artisan serve --host=0.0.0.0 --port=$PORT
+# 9. Render injecte automatiquement le bon port dans la variable $PORT.
+# Apache écoute sur le port 80 par défaut, on dit à Apache d'écouter sur le port de Render.
+RUN sed -i "s/Listen 80/Listen \${PORT}/g" /etc/apache2/ports.conf
+RUN sed -i "s/<VirtualHost \*:80>/<VirtualHost \*:\${PORT}>/g" /etc/apache2/sites-available/*.conf
+
+EXPOSE 80
+
+# Apache se lance automatiquement en arrière-plan avec cette image de base, 
+# pas besoin de CMD artisan serve !
