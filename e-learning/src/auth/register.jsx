@@ -52,6 +52,7 @@ const Register = () => {
     } catch (error) {
       if (error.response?.data?.message || error.message) {
         setError("Une erreur est survenue lors de l'inscription.");
+        setIsSubmitting(false)
       }
       setErrors(error.response.data.errors);
       setIsSubmitting(false);
