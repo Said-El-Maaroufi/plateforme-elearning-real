@@ -15,6 +15,10 @@ RUN apt-get update && apt-get install -y \
 # 2. Activer le module de réécriture d'Apache (indispensable pour les routes Laravel)
 RUN a2enmod rewrite
 
+# AJOUTE CES DEUX LIGNES ICI :
+RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+RUN sed -i '/<Directory \/var\/www\/html\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
+
 # 3. Changer le dossier racine d'Apache pour pointer vers le dossier "public" de Laravel
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
