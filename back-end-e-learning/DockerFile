@@ -50,3 +50,10 @@ EXPOSE 80
 
 # Apache se lance automatiquement en arrière-plan avec cette image de base, 
 # pas besoin de CMD artisan serve !
+
+# --- AJOUTS POUR LES MIGRATIONS ---
+# On rend le script d'entrée exécutable et on le configure
+RUN chmod +x /var/www/html/docker-entrypoint.sh
+
+ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
+CMD ["apache2-foreground"]
