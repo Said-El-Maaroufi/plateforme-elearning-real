@@ -62,6 +62,10 @@ Route::middleware(['auth:sanctum','super_admin'])->group(function () {
 
 });
 
+Route::get('/test', function (){
+    return "test back-eend";
+});
+
 
 
 
