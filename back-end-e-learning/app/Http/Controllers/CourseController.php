@@ -14,7 +14,8 @@ class CourseController extends Controller
     // _______________________________________________________________________________________________
                                             // AJOUTER
     // CREATION des courses
-    public function ajouter(Request $request)
+    public function ajouter(Request $request){
+        
     $validated = $request->validate([
         'title' => 'required|string',
         'description' => 'nullable|string',
