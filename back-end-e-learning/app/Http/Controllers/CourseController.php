@@ -102,131 +102,71 @@ class CourseController extends Controller
                                             // EDIT
 
     // modification
-    public function edit(Request $request, $id)
+   public function edit(Request $request, $id)
 {
     $course = Course::findOrFail($id);
 
     $validated = $request->validate([
-        // Validation du cours
         'title' => 'required|string',
         'description' => 'nullable|string',
         'image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
-
-        // Validation des vidéos
-        'videos' => 'required|array|min:1',
-        'videos.*' => [
-            function ($attribute, $value, $fail) {
-                // 1. CAS DU FICHIER : Si c'est un fichier uploadé
-                if (request()->hasFile($attribute)) {
-                    $file = request()->file($attribute);
-                    $allowedMimes = ['video/mp4', 'video/quicktime', 'video/x-msvideo'];
-                    
-                    if (!in_array($file->getMimeType(), $allowedMimes)) {
-                        return $fail("Le fichier doit être une vidéo au format mp4, mov ou avi.");
-                    }
-                    if ($file->getSize() > 20480 * 1024) {
-                        return $fail("La vidéo ne doit pas dépasser 20 Mo.");
-                    }
-                } 
-                // 2. CAS DE L'URL (STRING) : Si c'est une chaîne de texte
-                else if (is_string($value)) {
-                    $exists = DB::table('videos')->where('file', $value)->exists();
-                    
-                    if (!$exists) {
-                        return $fail("Cette URL de vidéo n'existe pas dans notre base de données.");
-                    }
-                } 
-                // 3. CAS INVALIDE
-                else {
-                    return $fail("Le format envoyé est invalide.");
-                }
-            }
-        ],
+        'videos' => 'nullable|array',
+        'videos.*' => 'file|mimes:mp4,mov,avi|max:512000',
     ]);
 
-    // Remplacement de l'image de couverture si un nouveau fichier est fourni
+    // Update de l'image si fournie
     if ($request->hasFile('image')) {
-        if ($course->image && Storage::disk('public')->exists($course->image)) {
-            Storage::disk('public')->delete($course->image);
-        }
         $validated['image'] = $request->file('image')->store('images', 'public');
-    } else {
-        $validated['image'] = $course->image;
+        $course->image = $validated['image'];
     }
 
-    // Mise à jour du cours
-    $course->update([
-        'title' => $validated['title'],
-        'description' => $validated['description'],
-        'image' => $validated['image']
-    ]);
+    $course->title = $validated['title'];
+    $course->description = $validated['description'] ?? null;
+    $course->save();
 
-    // Récupération des fichiers vidéos envoyés
-    $files = $request->input('videos', []);
-    $an_videos = $course->videos;
+    // Détection OS pour les binaire FFmpeg (Linux dans Docker/Render vs Windows en Local)
+    $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+    $ffmpegPath = $isWindows ? base_path('ffmpeg/ffmpeg.exe') : '/usr/bin/ffmpeg';
+    $ffprobePath = $isWindows ? base_path('ffmpeg/ffprobe.exe') : '/usr/bin/ffprobe';
 
-    // Filtrer les chaînes de caractères (anciennes vidéos conservées)
-    $string_files = array_filter($files, function ($file) {
-        return is_string($file);
-    });
+    // Ajout de nouvelles vidéos si transmises
+    if ($request->hasFile('videos')) {
+        // On récupère le dernier ordre pour continuer la séquence
+        $lastOrder = $course->videos()->max('order') ?? 0;
 
-    // Supprimer physiquement et en BDD les vidéos retirées par l'utilisateur
-    foreach ($an_videos as $an_video) {
-        if (!in_array($an_video->file, $string_files)) {
-            if (Storage::disk('public')->exists($an_video->file)) {
-                Storage::disk('public')->delete($an_video->file);
-            }
-            $an_video->delete();
-        }
-    }
+        foreach ($request->file('videos') as $key => $file) {
+            $path = $file->store('videos', 'public');
+            $absolutePath = storage_path('app/public/' . $path);
 
-    // Traitement de l'ordre et enregistrement des nouvelles vidéos
-    foreach ($files as $key => $file) {
-        if (is_string($file)) {
-            // Mettre à jour l'ordre des anciennes vidéos
-            Video::where('course_id', $course->id)
-                ->where('file', $file)
-                ->update(['order' => $key + 1]);
-        } else {
-            // Traiter et enregistrer les nouveaux fichiers téléversés
-            if ($request->hasFile("videos.$key")) {
-                $fileUploaded = $request->file("videos.$key");
-
-                $path = $fileUploaded->store('videos', 'public');
-                $absolutePath = storage_path('app/public/' . $path);
-                
-                $ffmpegPath = base_path('ffmpeg/ffmpeg.exe');
-                $ffprobePath = base_path('ffmpeg/ffprobe.exe');
-
-                $durationInSeconds = 0;
-                
-                // Extraction de la durée via FFmpeg
-                try {
-                    $ffmpeg = FFmpeg::create([
-                        'ffmpeg.binaries'  => $ffmpegPath,
-                        'ffprobe.binaries' => $ffprobePath,
-                    ]);
-                    $videoTrack = $ffmpeg->open($absolutePath);
-                    $durationInSeconds = $videoTrack->getFormat()->get('duration');
-                } catch (\Exception $e) {
-                    // Si FFmpeg échoue, la durée par défaut est 0 pour éviter de bloquer l'enregistrement
-                    Log::error("FFmpeg error: " . $e->getMessage());
-                }
-
-                Video::create([
-                    'title' => $fileUploaded->getClientOriginalName(),
-                    'file' => $path,
-                    'course_id' => $course->id,
-                    'duree_en_seconde' => round($durationInSeconds),
-                    'order' => $key + 1
+            try {
+                $ffmpeg = \FFMpeg\FFMpeg::create([
+                    'ffmpeg.binaries'  => $ffmpegPath,
+                    'ffprobe.binaries' => $ffprobePath,
+                    'timeout'          => 3600,
                 ]);
+
+                $videoTrack = $ffmpeg->open($absolutePath);
+                $durationInSeconds = $videoTrack->getFormat()->get('duration');
+                $duree = round($durationInSeconds);
+            } catch (\Exception $e) {
+                $duree = 0;
             }
+
+            Video::create([
+                'title' => $file->getClientOriginalName(),
+                'file' => $path,
+                'course_id' => $course->id,
+                'duree_en_seconde' => $duree,
+                'order' => $lastOrder + $key + 1
+            ]);
         }
     }
 
-    return response()->json(['message' => 'Le cours a été bien modifié'], 200);
+    return response()->json([
+        'message' => 'Le cours a été mis à jour avec succès',
+        'course' => $course->load('videos')
+    ], 200);
 }
-
     // ____________________________________________________________________________________________________________________
                                                 // DELETE
     // supprimer un video
