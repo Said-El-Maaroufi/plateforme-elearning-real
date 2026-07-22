@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import api from "./api/axios"; // Importe ton instance Axios configurée
+import api from "../../api/axios"; // Importe ton instance Axios configurée
 
 export default function UpdateCourse() {
   const { id } = useParams();
@@ -26,9 +26,8 @@ export default function UpdateCourse() {
       try {
         const response = await api.get(`/course/${id}/edit`);
         const course = response.data.course || response.data;
-
         setData({
-          title: course.title || course.titre || "",
+          title: course.title || "",
           description: course.description || "",
           image: null, // On garde null pour ne pas surcharger si pas de nouvelle image
         });
