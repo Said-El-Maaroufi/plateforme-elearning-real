@@ -11,6 +11,22 @@ use Illuminate\Support\Facades\Storage;
 
 class CourseController extends Controller
 {
+
+public function deleteVideo($id)
+{
+    $video = Video::findOrFail($id);
+    
+
+    // Supprimer le fichier vidéo du disque de stockage s'il existe
+    if (Storage::disk('public')->exists($video->file)) {
+        Storage::disk('public')->delete($video->file);
+    }
+
+    // Supprimer l'enregistrement en base de données
+    $video->delete();
+
+    return response()->json(['message' => 'Vidéo supprimée avec succès']);
+}
     // _______________________________________________________________________________________________
                                             // AJOUTER
     // CREATION des courses

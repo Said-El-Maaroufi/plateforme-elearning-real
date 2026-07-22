@@ -37,6 +37,7 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function(){
     Route::get('/user/{id}', [userController::class, 'show']);
     Route::get('/accee/{id}', [userController::class, 'getAccee']);
     Route::post('/accee/update', [userController::class, 'updateAccee']);
+    Route::delete('/video/{id}', [CourseController::class, 'deleteVideo']);
     
     });
 
