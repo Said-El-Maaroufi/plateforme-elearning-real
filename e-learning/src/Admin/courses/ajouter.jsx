@@ -11,6 +11,7 @@ const AddCours = () => {
   const [files, setFiles] = useState([]);
   const [error, setError] = useState(null);
   const [errors, setErrors] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const [data, setData] = useState({
@@ -29,7 +30,7 @@ const AddCours = () => {
       return;
     }
 
-    if (user && user.role !== 'admin' && !user.is_admin) {
+    if (user && user.role !== "admin" && !user.is_admin) {
       alert("Accès refusé ! Espace réservé aux administrateurs.");
       navigate("/");
     }
@@ -51,7 +52,7 @@ const AddCours = () => {
     setFiles(selectedFiles);
 
     // Révoquer les anciennes URLs pour libérer la mémoire du navigateur
-    urlVideos.forEach(url => URL.revokeObjectURL(url));
+    urlVideos.forEach((url) => URL.revokeObjectURL(url));
 
     setUrLVideos(selectedFiles.map((file) => URL.createObjectURL(file)));
   };
@@ -67,12 +68,13 @@ const AddCours = () => {
   // Envoyer les données
   const sentData = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true); // Bloquer le bouton
 
     try {
       const formData = new FormData();
       formData.append("title", data.titre);
       formData.append("description", data.description);
-      
+
       if (data.image) {
         formData.append("image", data.image);
       }
@@ -81,34 +83,30 @@ const AddCours = () => {
         formData.append("videos[]", file);
       });
 
-      // 🚀 Envoi de la requête sécurisée
       await api.post("/ajouter", formData, {
         headers: {
-          Accept: "application/json",
           "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}` // 🔥 Envoi du jeton pour passer le middleware auth:sanctum
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
-      navigate('/cours');
-      
+
+      navigate("/cours");
     } catch (error) {
       if (error.response) {
-        // En cas de rejet d'authentification ou d'expiration de session
         if (error.response.status === 403 || error.response.status === 401) {
-          alert("Votre session a expiré ou vous n'avez plus les droits d'administrateur.");
+          alert(
+            "Votre session a expiré ou vous n'avez plus les droits d'administrateur.",
+          );
           navigate("/");
           return;
         }
-
-        if (error.response.data && error.response.data.errors) {
-          setErrors(error.response.data.errors);
-        } else {
-          setError(error.response.data.message || "Une erreur est survenue.");
-        }
+        setErrors(error.response.data.errors || null);
+        setError(error.response.data.message || "Une erreur est survenue.");
       } else {
         setError(error.message);
       }
+    } finally {
+      setIsSubmitting(false); // Réactiver le bouton
     }
   };
 
@@ -125,18 +123,18 @@ const AddCours = () => {
     <div className="container my-5">
       <div className="row justify-content-center">
         <div className="col-md-6 col-lg-5 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-          
           {error && <div className="alert alert-danger shadow-sm">{error}</div>}
-          
+
           <h1 className="text-2xl font-bold text-center text-slate-800 mb-4">
             Ajouter un Cours
           </h1>
-          
+
           <form onSubmit={sentData} encType="multipart/form-data">
-            
             {/* Titre */}
             <div className="mb-3">
-              <label className="form-label font-medium text-slate-700">Titre</label>
+              <label className="form-label font-medium text-slate-700">
+                Titre
+              </label>
               <input
                 type="text"
                 name="titre"
@@ -144,14 +142,18 @@ const AddCours = () => {
                   setData({ ...data, [e.target.name]: e.target.value })
                 }
                 value={data.titre}
-                className={`form-control ${errors?.title ? 'is-invalid' : ''}`}
+                className={`form-control ${errors?.title ? "is-invalid" : ""}`}
               />
-              {errors?.title && <div className="invalid-feedback">{errors.title[0]}</div>}
+              {errors?.title && (
+                <div className="invalid-feedback">{errors.title[0]}</div>
+              )}
             </div>
 
             {/* Description */}
             <div className="mb-3">
-              <label className="form-label font-medium text-slate-700">Description</label>
+              <label className="form-label font-medium text-slate-700">
+                Description
+              </label>
               <textarea
                 name="description"
                 onChange={(e) =>
@@ -165,7 +167,9 @@ const AddCours = () => {
 
             {/* Image */}
             <div className="mb-3">
-              <label className="form-label font-medium text-slate-700">Image de couverture</label>
+              <label className="form-label font-medium text-slate-700">
+                Image de couverture
+              </label>
               <input
                 type="file"
                 name="image"
@@ -179,23 +183,30 @@ const AddCours = () => {
 
             {/* Vidéos */}
             <div className="mb-4">
-              <label className="form-label font-medium text-slate-700">Vidéos du cours</label>
+              <label className="form-label font-medium text-slate-700">
+                Vidéos du cours
+              </label>
               <input
                 type="file"
                 onChange={showVideo}
                 name="videos"
                 accept="video/*"
                 multiple
-                className={`form-control ${errors?.videos ? 'is-invalid' : ''}`}
+                className={`form-control ${errors?.videos ? "is-invalid" : ""}`}
               />
-              {errors?.videos && <div className="invalid-feedback">{errors.videos[0]}</div>}
-              
+              {errors?.videos && (
+                <div className="invalid-feedback">{errors.videos[0]}</div>
+              )}
+
               {/* Prévisualisation des vidéos */}
               <div className="mt-3">
                 {urlVideos.length > 0 && (
                   <ul className="list-group gap-2">
                     {urlVideos.map((urlVideo, index) => (
-                      <li key={index} className="list-group-item d-flex align-items-center justify-content-between p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <li
+                        key={index}
+                        className="list-group-item d-flex align-items-center justify-content-between p-2 rounded-xl bg-slate-50 border border-slate-100"
+                      >
                         <video
                           src={urlVideo}
                           className="rounded bg-black object-contain"
@@ -219,18 +230,23 @@ const AddCours = () => {
 
             {/* Actions */}
             <div className="d-grid gap-2">
-              <button type="submit" className="btn btn-success py-2.5 font-medium rounded-xl shadow-sm">
-                Enregistrer la formation
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn btn-success py-2.5 font-medium rounded-xl shadow-sm"
+              >
+                {isSubmitting
+                  ? "Envoi et traitement de la vidéo en cours..."
+                  : "Enregistrer la formation"}
               </button>
-              <button 
-                type="button" 
-                onClick={() => navigate('/cours')} 
+              <button
+                type="button"
+                onClick={() => navigate("/cours")}
                 className="btn btn-outline-secondary py-2 font-medium rounded-xl"
               >
                 Annuler
               </button>
             </div>
-
           </form>
         </div>
       </div>

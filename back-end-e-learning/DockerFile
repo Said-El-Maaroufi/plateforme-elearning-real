@@ -1,6 +1,6 @@
 FROM php:8.2-apache
 
-# 1. Installer les dépendances système nécessaires
+# 1. Installer les dépendances système (FFmpeg + dos2unix ajoutés ici)
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -9,13 +9,20 @@ RUN apt-get update && apt-get install -y \
     unzip \
     git \
     curl \
+    ffmpeg \
+    dos2unix \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo_mysql gd
+
+# 1b. Configurer PHP pour autoriser l'upload de grandes vidéos (jusqu'à 512 Mo)
+RUN echo "upload_max_filesize = 512M" >> /usr/local/etc/php/conf.d/uploads.ini \
+ && echo "post_max_size = 512M" >> /usr/local/etc/php/conf.d/uploads.ini \
+ && echo "memory_limit = 512M" >> /usr/local/etc/php/conf.d/uploads.ini \
+ && echo "max_execution_time = 300" >> /usr/local/etc/php/conf.d/uploads.ini
 
 # 2. Activer le module de réécriture d'Apache (indispensable pour les routes Laravel)
 RUN a2enmod rewrite
 
-# AJOUTE CES DEUX LIGNES ICI :
 RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 RUN sed -i '/<Directory \/var\/www\/html\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 
@@ -23,7 +30,6 @@ RUN sed -i '/<Directory \/var\/www\/html\/>/,/<\/Directory>/ s/AllowOverride Non
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/sites-available/*.conf
-# Ligne ajoutée pour supprimer l'avertissement AH00558 :
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 # 4. Définir le dossier de travail officiel d'Apache
@@ -35,24 +41,20 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # 6. Copier les fichiers du projet Laravel
 COPY . .
 
-# 7. Donner les bonnes permissions aux dossiers de stockage (sinon Laravel va crasher)
+# 7. Donner les bonnes permissions aux dossiers de stockage
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
 # 8. Installer les dépendances Composer sans les outils de dev
 RUN composer install --no-dev --optimize-autoloader
 
-# 9. Render injecte automatiquement le bon port dans la variable $PORT.
-# Apache écoute sur le port 80 par défaut, on dit à Apache d'écouter sur le port de Render.
+# 9. Adapter le port pour Render
 RUN sed -i "s/Listen 80/Listen \${PORT}/g" /etc/apache2/ports.conf
 RUN sed -i "s/<VirtualHost \*:80>/<VirtualHost \*:\${PORT}>/g" /etc/apache2/sites-available/*.conf
 
 EXPOSE 80
 
-# Apache se lance automatiquement en arrière-plan avec cette image de base, 
-# pas besoin de CMD artisan serve !
-
-# --- AJOUTS POUR LES MIGRATIONS ---
-# On rend le script d'entrée exécutable et on le configure
+# Convertir les fins de ligne de docker-entrypoint.sh (évite les bugs Windows/Linux) et le rendre exécutable
+RUN dos2unix /var/www/html/docker-entrypoint.sh
 RUN chmod +x /var/www/html/docker-entrypoint.sh
 
 ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]

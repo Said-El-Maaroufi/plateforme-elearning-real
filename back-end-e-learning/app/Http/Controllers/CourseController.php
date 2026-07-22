@@ -15,57 +15,61 @@ class CourseController extends Controller
                                             // AJOUTER
     // CREATION des courses
     public function ajouter(Request $request)
-    {
+    $validated = $request->validate([
+        'title' => 'required|string',
+        'description' => 'nullable|string',
+        'image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        'videos' => 'required|array|min:1',
+        'videos.*' => 'file|mimes:mp4,mov,avi|max:512000',
+    ]);
 
-        $validated = $request->validate([
-            // validation de cour
-            'title' => 'required|string',
-            'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+    if ($request->hasFile('image')) {
+        $validated['image'] = $request->file('image')->store('images', 'public');
+    }
 
-            // validation de video
-            'videos' => 'required|array|min:1',
-            'videos.*' => 'file|mimes:mp4,mov,avi|max:512000',
-        ]);
+    $course = Course::create([
+        'title' => $validated['title'],
+        'description' => $validated['description'] ?? null,
+        'image' => $validated['image'] ?? null,
+    ]);
 
-        if ($request->hasFile('image')) {
-            $validated['image'] = $request->file('image')->store('images', 'public');
-        }
+    $files = $validated['videos'];
 
+    // Detection automatique OS (Linux pour Render vs Windows pour Local)
+    $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+    $ffmpegPath = $isWindows ? base_path('ffmpeg/ffmpeg.exe') : '/usr/bin/ffmpeg';
+    $ffprobePath = $isWindows ? base_path('ffmpeg/ffprobe.exe') : '/usr/bin/ffprobe';
 
-        $course = Course::create($validated);
+    foreach ($files as $key => $file) {
+        $path = $file->store('videos', 'public');
+        $absolutePath = storage_path('app/public/' . $path);
 
-        $files = $validated['videos'];
-
-
-        foreach ($files as $key => $file) {
-
-            $path = $file->store('videos', 'public');
-            $absolutePath = storage_path('app/public/' . $path);
-            // On pointe vers le dossier "ffmpeg" que tu viens de créer à la racine du projet
-            $ffmpegPath = base_path('ffmpeg/ffmpeg.exe');
-            $ffprobePath = base_path('ffmpeg/ffprobe.exe');
-
-            // On initialise FFmpeg avec ces chemins locaux
+        try {
             $ffmpeg = FFmpeg::create([
-            'ffmpeg.binaries'  => $ffmpegPath,
-            'ffprobe.binaries' => $ffprobePath,
+                'ffmpeg.binaries'  => $ffmpegPath,
+                'ffprobe.binaries' => $ffprobePath,
+                'timeout'          => 3600, // Augmenter le timeout pour les gros fichiers
             ]);
+
             $videoTrack = $ffmpeg->open($absolutePath);
             $durationInSeconds = $videoTrack->getFormat()->get('duration');
-            Video::create([
-                'title' => $file->getClientOriginalName(),
-                // getClientOriginalName                ()
-                'file' => $path,
-                'course_id' => $course->id,
-                'duree_en_seconde' => round($durationInSeconds),
-                'order' => $key + 1
-
-            ]);
+            $duree = round($durationInSeconds);
+        } catch (\Exception $e) {
+            // En cas de problème de lecture de durée avec FFmpeg, on met une valeur par défaut pour ne pas bloquer l'upload
+            $duree = 0;
         }
 
-        return response()->json(['message' => 'le cours a ete bien ajouter'], 201);
+        Video::create([
+            'title' => $file->getClientOriginalName(),
+            'file' => $path,
+            'course_id' => $course->id,
+            'duree_en_seconde' => $duree,
+            'order' => $key + 1
+        ]);
     }
+
+    return response()->json(['message' => 'Le cours a été bien ajouté'], 201);
+}
     // ____________________________________________________________________________________________________________________
                                             // INDEX
     // Affichage des courses
