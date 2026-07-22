@@ -42,7 +42,7 @@ const UpdateCours = () => {
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        const response = await api.get(`/cours/${id}`, {
+        const response = await api.get(`/course/${id}/edit`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const course = response.data;
@@ -103,7 +103,7 @@ const UpdateCours = () => {
         formData.append("videos[]", file);
       });
 
-      await api.post(`/modifier/${id}`, formData, {
+      await api.post(`/course/${id}/edit`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           Authorization: `Bearer ${token}`,
