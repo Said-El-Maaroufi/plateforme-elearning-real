@@ -1,265 +1,236 @@
-import { useState, useEffect, useContext } from "react";
-import api from "../../api/axios";
-import { useNavigate, useParams } from "react-router-dom";
-import { Cntx } from "../../context/context";
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import api from "./api/axios"; // Importe ton instance Axios configurée
 
-const UpdateCours = () => {
+export default function UpdateCourse() {
   const { id } = useParams();
-  const { token, loading: contextLoading, user } = useContext(Cntx);
-
-  const [urlVideos, setUrLVideos] = useState([]);
-  const [files, setFiles] = useState([]);
-  const [existingVideos, setExistingVideos] = useState([]);
-  const [error, setError] = useState(null);
-  const [errors, setErrors] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [fetchingCourse, setFetchingCourse] = useState(true);
   const navigate = useNavigate();
 
+  // État du formulaire
   const [data, setData] = useState({
-    titre: "",
+    title: "",
     description: "",
-    image: null,
+    image: null, // Nouveau fichier binaire si sélectionné
   });
 
-  // Protection d'accès
-  useEffect(() => {
-    if (contextLoading) return;
+  // États pour l'interface utilisateur
+  const [currentImage, setCurrentImage] = useState(null); // URL de l'image existante depuis Laravel
+  const [previewUrl, setPreviewUrl] = useState(null); // Prévisualisation de la nouvelle image sélectionnée
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
 
-    if (!token) {
-      alert("Accès refusé ! Veuillez vous connecter.");
-      navigate("/login");
-      return;
-    }
-
-    if (user && user.role !== "admin" && !user.is_admin) {
-      alert("Accès refusé ! Espace réservé aux administrateurs.");
-      navigate("/");
-    }
-  }, [token, contextLoading, user, navigate]);
-
-  // Chargement des données existantes du cours
+  // 1. Récupérer les données du cours à modifier
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        const response = await api.get(`/course/${id}/edit`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const course = response.data;
+        const response = await api.get(`/courses/${id}`);
+        const course = response.data.course || response.data;
+
         setData({
-          titre: course.title || "",
+          title: course.title || course.titre || "",
           description: course.description || "",
-          image: null,
+          image: null, // On garde null pour ne pas surcharger si pas de nouvelle image
         });
-        setExistingVideos(course.videos || []);
+
+        // Récupérer le chemin de l'image existante
+        if (course.image) {
+          setCurrentImage(course.image);
+        }
       } catch (err) {
-        setError("Erreur lors de la récupération du cours.");
+        console.error("Erreur lors de la récupération du cours :", err);
+        alert("Impossible de charger les données du cours.");
       } finally {
-        setFetchingCourse(false);
+        setLoading(false);
       }
     };
 
-    if (token) fetchCourse();
-  }, [id, token]);
+    fetchCourse();
+  }, [id]);
 
-  // Nettoyage temporisé des erreurs
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(null), 3000);
-      return () => clearTimeout(timer);
+  // 2. Gérer le changement d'image
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setData((prev) => ({ ...prev, image: file }));
+      setPreviewUrl(URL.createObjectURL(file)); // Crée une URL temporaire pour la prévisualisation
     }
-  }, [error]);
-
-  const showVideo = (e) => {
-    const selectedFiles = Array.from(e.target.files);
-    setFiles(selectedFiles);
-
-    urlVideos.forEach((url) => URL.revokeObjectURL(url));
-    setUrLVideos(selectedFiles.map((file) => URL.createObjectURL(file)));
   };
 
-  const supNewVideo = (index) => {
-    URL.revokeObjectURL(urlVideos[index]);
-    setFiles(files.filter((_, i) => i !== index));
-    setUrLVideos(urlVideos.filter((_, i) => i !== index));
-  };
-
-  const sentData = async (e) => {
+  // 3. Soumettre les modifications à Laravel
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true); // Bloquer le bouton
+    setSubmitting(true);
+    setErrors({});
+
+    const formData = new FormData();
+    formData.append("title", data.title);
+    formData.append("description", data.description);
+
+    // Astro-astuce Laravel : PHP/Laravel ne lit pas 'multipart/form-data' lors d'une vraie requête PUT.
+    // On fait donc un POST avec le champ _method: "PUT"
+    formData.append("_method", "PUT");
+
+    // N'ajouter l'image au FormData que si un nouveau fichier a été sélectionné
+    if (data.image) {
+      formData.append("image", data.image);
+    }
 
     try {
-      const formData = new FormData();
-      // On passe _method pour simuler PUT avec multipart/form-data
-      formData.append("_method", "PUT"); 
-      formData.append("title", data.titre);
-      formData.append("description", data.description);
-
-      if (data.image) {
-        formData.append("image", data.image);
-      }
-
-      files.forEach((file) => {
-        formData.append("videos[]", file);
-      });
-
-      await api.post(`/course/${id}/edit`, formData, {
+      await api.post(`/courses/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
         },
       });
 
-      navigate("/cours");
-    } catch (error) {
-      if (error.response) {
-        if (error.response.status === 403 || error.response.status === 401) {
-          alert("Votre session a expiré ou vous n'avez plus les droits requis.");
-          navigate("/");
-          return;
-        }
-        setErrors(error.response.data.errors || null);
-        setError(error.response.data.message || "Une erreur est survenue.");
+      alert("Le cours a été mis à jour avec succès !");
+      navigate("/courses"); // Redirection vers la liste
+    } catch (err) {
+      console.error("Erreur de mise à jour :", err);
+      if (err.response && err.response.data && err.response.data.errors) {
+        setErrors(err.response.data.errors);
       } else {
-        setError(error.message);
+        alert("Une erreur est survenue lors de la mise à jour.");
       }
     } finally {
-      setIsSubmitting(false); // Réactiver le bouton une fois fini
+      setSubmitting(false);
     }
   };
 
-  if (contextLoading || fetchingCourse) {
+  // Fonction utilitaire pour générer l'URL complète d'une image stockée dans storage
+  const getStorageUrl = (path) => {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    // URL de base Render sans le /api de la fin
+    return `https://learnhub-backend-07qn.onrender.com/storage/${path}`;
+  };
+
+  if (loading) {
     return (
-      <div className="text-center py-20 text-muted font-bold">
-        Chargement des informations du cours...
+      <div className="flex justify-center items-center h-64">
+        <p className="text-slate-600 font-medium">Chargement des données du cours...</p>
       </div>
     );
   }
 
   return (
-    <div className="container my-5">
-      <div className="row justify-content-center">
-        <div className="col-md-6 col-lg-5 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-          {error && <div className="alert alert-danger shadow-sm">{error}</div>}
+    <div className="max-w-2xl mx-auto m-6 p-6 bg-white rounded-xl shadow-md border border-slate-100">
+      <h2 className="text-2xl font-bold text-slate-800 mb-6">
+        Modifier le cours #{id}
+      </h2>
 
-          <h1 className="text-2xl font-bold text-center text-slate-800 mb-4">
-            Modifier le Cours
-          </h1>
-
-          <form onSubmit={sentData} encType="multipart/form-data">
-            {/* Titre */}
-            <div className="mb-3">
-              <label className="form-label font-medium text-slate-700">Titre</label>
-              <input
-                type="text"
-                name="titre"
-                onChange={(e) => setData({ ...data, titre: e.target.value })}
-                value={data.titre}
-                className={`form-control ${errors?.title ? "is-invalid" : ""}`}
-              />
-              {errors?.title && (
-                <div className="invalid-feedback">{errors.title[0]}</div>
-              )}
-            </div>
-
-            {/* Description */}
-            <div className="mb-3">
-              <label className="form-label font-medium text-slate-700">Description</label>
-              <textarea
-                name="description"
-                onChange={(e) => setData({ ...data, description: e.target.value })}
-                value={data.description}
-                className="form-control"
-                rows="3"
-              ></textarea>
-            </div>
-
-            {/* Nouvelle Image de couverture */}
-            <div className="mb-3">
-              <label className="form-label font-medium text-slate-700">
-                Changer l'image de couverture (optionnel)
-              </label>
-              <input
-                type="file"
-                name="image"
-                accept="image/*"
-                onChange={(e) => setData({ ...data, image: e.target.files[0] })}
-                className="form-control"
-              />
-            </div>
-
-            {/* Ajouter de nouvelles Vidéos */}
-            <div className="mb-4">
-              <label className="form-label font-medium text-slate-700">
-                Ajouter des nouvelles vidéos
-              </label>
-              <input
-                type="file"
-                onChange={showVideo}
-                name="videos"
-                accept="video/*"
-                multiple
-                className={`form-control ${errors?.videos ? "is-invalid" : ""}`}
-              />
-              {errors?.videos && (
-                <div className="invalid-feedback">{errors.videos[0]}</div>
-              )}
-
-              {/* Aperçu des nouvelles vidéos sélectionnées */}
-              <div className="mt-3">
-                {urlVideos.length > 0 && (
-                  <ul className="list-group gap-2">
-                    {urlVideos.map((urlVideo, index) => (
-                      <li
-                        key={index}
-                        className="list-group-item d-flex align-items-center justify-content-between p-2 rounded-xl bg-slate-50 border border-slate-100"
-                      >
-                        <video
-                          src={urlVideo}
-                          className="rounded bg-black object-contain"
-                          controls
-                          width={140}
-                          height={80}
-                        ></video>
-                        <button
-                          type="button"
-                          onClick={() => supNewVideo(index)}
-                          className="btn btn-sm btn-danger px-3 py-1 rounded-lg"
-                        >
-                          Retirer
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="d-grid gap-2">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="btn btn-primary py-2.5 font-medium rounded-xl shadow-sm disabled:opacity-50"
-              >
-                {isSubmitting
-                  ? "Envoi et traitement des modifications..."
-                  : "Enregistrer les modifications"}
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/cours")}
-                disabled={isSubmitting}
-                className="btn btn-outline-secondary py-2 font-medium rounded-xl"
-              >
-                Annuler
-              </button>
-            </div>
-          </form>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Titre */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">
+            Titre du cours
+          </label>
+          <input
+            type="text"
+            value={data.title}
+            onChange={(e) => setData({ ...data, title: e.target.value })}
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+              errors.title
+                ? "border-red-500 focus:ring-red-200"
+                : "border-slate-300 focus:ring-indigo-200 focus:border-indigo-500"
+            }`}
+            placeholder="Ex: Formation React & Laravel"
+            required
+          />
+          {errors.title && (
+            <p className="text-red-500 text-xs mt-1">{errors.title[0]}</p>
+          )}
         </div>
-      </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1">
+            Description
+          </label>
+          <textarea
+            rows="4"
+            value={data.description}
+            onChange={(e) => setData({ ...data, description: e.target.value })}
+            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+              errors.description
+                ? "border-red-500 focus:ring-red-200"
+                : "border-slate-300 focus:ring-indigo-200 focus:border-indigo-500"
+            }`}
+            placeholder="Description détaillée du cours..."
+          />
+          {errors.description && (
+            <p className="text-red-500 text-xs mt-1">{errors.description[0]}</p>
+          )}
+        </div>
+
+        {/* Gestion de l'image */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Image de couverture
+          </label>
+
+          {/* Zone d'affichage / prévisualisation de l'image */}
+          <div className="flex items-center gap-4 mb-3">
+            {previewUrl ? (
+              <div>
+                <p className="text-xs text-indigo-600 font-semibold mb-1">
+                  Nouvelle image sélectionnée :
+                </p>
+                <img
+                  src={previewUrl}
+                  alt="Nouvelle couverture"
+                  className="w-32 h-20 object-cover rounded-lg border-2 border-indigo-400 shadow-sm"
+                />
+              </div>
+            ) : currentImage ? (
+              <div>
+                <p className="text-xs text-slate-500 font-semibold mb-1">
+                  Image actuelle :
+                </p>
+                <img
+                  src={getStorageUrl(currentImage)}
+                  alt="Couverture actuelle"
+                  className="w-32 h-20 object-cover rounded-lg border border-slate-200 shadow-sm"
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">Aucune image enregistrée pour ce cours.</p>
+            )}
+          </div>
+
+          {/* Champ d'upload */}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            Laissez vide si vous souhaitez conserver l'image actuelle.
+          </p>
+          {errors.image && (
+            <p className="text-red-500 text-xs mt-1">{errors.image[0]}</p>
+          )}
+        </div>
+
+        {/* Boutons d'action */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => navigate("/courses")}
+            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-50 transition"
+          >
+            {submitting ? "Mise à jour en cours..." : "Enregistrer les modifications"}
+          </button>
+        </div>
+      </form>
     </div>
   );
-};
-
-export default UpdateCours;
+}
