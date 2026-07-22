@@ -6,14 +6,22 @@ use App\Http\Controllers\userController;
 use App\Http\Middleware\CheckSuperAdmin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/user', function () {
     return Auth::user();
 })->middleware('auth:sanctum');
 
-
-
+Route::get('/ping', function () {
+    try {
+        // Exécute une requête SQL minimale pour garder la connexion Aiven active
+        DB::select('SELECT 1');
+        return response()->json(['status' => 'ok', 'database' => 'connected']);
+    } catch (\Exception $e) {
+        return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+    }
+});
 
 
 // courses crud
