@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom'; 
 import api from '../api/axios';
-import { Cntx } from '../context/context'; // 🔥 Importation de ton contexte global
+import { Cntx } from '../context/context';
 
 const CourseWorkspace = () => {
     const { courseId } = useParams(); 
     const navigate = useNavigate();   
     
-    // 🔥 Récupération du token et du statut de chargement de la session globale
     const { token, loading: contextLoading } = useContext(Cntx);
     
     const [course, setCourse] = useState(null);
@@ -18,22 +17,23 @@ const CourseWorkspace = () => {
     const [maxAccessibleIndex, setMaxAccessibleIndex] = useState(0);
     const [videoCompleted, setVideoCompleted] = useState(false);
 
+    // Dynamic base URL for media static files
+    const STORAGE_BASE_URL = import.meta.env.VITE_API_BASE_URL 
+        ? import.meta.env.VITE_API_BASE_URL.replace('/api', '') 
+        : 'http://localhost:8000';
+
     useEffect(() => {
-        // ⏳ Étape 1 : On attend que l'état global d'authentification soit chargé
         if (contextLoading) return;
 
-        // 🔒 Étape 2 : Sécurité côté Client - Si le jeton local est manquant
         if (!token) {
             localStorage.setItem('message', 'Veuillez vous connecter pour accéder à votre espace.');
             navigate('/login');
             return;
         }
 
-        // 🚀 Étape 3 : Requête API avec le jeton d'authentification
         api.get(`/cour/${courseId}`, {
-            headers : {
-                Accept : "application/json",
-                Authorization: `Bearer ${token}` // Envoi du Token pour Laravel Sanctum
+            headers: {
+                Authorization: `Bearer ${token}`
             }
         })
             .then(response => {
@@ -45,14 +45,12 @@ const CourseWorkspace = () => {
                 console.error("Erreur d'accès au cours :", err);
 
                 if (err.response) {
-                    // 🚫 Cas 1 : L'utilisateur est connecté mais Laravel a renvoyé 403 (Pas inscrit à la table pivot)
                     if (err.response.status === 403) {
                         alert(err.response.data.message || "🔒 Accès refusé ! Vous n'êtes pas inscrit à cette formation.");
-                        navigate('/courses'); // Redirection vers le catalogue
+                        navigate('/courses');
                         return;
                     }
 
-                    // 🚨 Cas 2 : Session expirée ou jeton invalide (Erreur 401)
                     if (err.response.status === 401) {
                         localStorage.setItem('message', 'Votre session a expiré. Veuillez vous reconnecter.');
                         navigate('/login'); 
@@ -65,7 +63,6 @@ const CourseWorkspace = () => {
             });
     }, [courseId, navigate, token, contextLoading]);
 
-    // ⏳ Écran d'attente initial (pendant la validation du token et la récupération API)
     if (contextLoading || loading) {
         return (
             <div className="text-center py-20 text-white bg-gray-900 min-h-screen flex items-center justify-center font-medium">
@@ -74,7 +71,6 @@ const CourseWorkspace = () => {
         );
     }
 
-    // ⚠️ Affichage en cas d'erreur générale
     if (error) {
         return (
             <div className="text-center py-20 text-white bg-gray-900 min-h-screen flex flex-col items-center justify-center gap-4">
@@ -99,14 +95,24 @@ const CourseWorkspace = () => {
 
     const currentVideo = videos[currentVideoIndex];
 
-    // Fonction pour gérer la sélection d'une vidéo
     const selectVideo = (index) => {
         if (index > maxAccessibleIndex) {
             alert("🔒 Vous devez terminer la vidéo actuelle avant de pouvoir passer à la suivante !");
             return;
         }
         setCurrentVideoIndex(index);
+        // Réinitialise le statut de complétion selon si la vidéo sélectionnée est déjà dépassée ou non
         setVideoCompleted(index < maxAccessibleIndex);
+    };
+
+    const handleVideoEnd = () => {
+        setVideoCompleted(true);
+        if (currentVideoIndex + 1 > maxAccessibleIndex && currentVideoIndex + 1 < videos.length) {
+            setMaxAccessibleIndex(currentVideoIndex + 1);
+            
+            // 💡 Optionnel : Envoyer la progression au serveur Laravel ici
+            // api.post('/user-progress', { course_id: courseId, video_id: currentVideo.id });
+        }
     };
 
     return (
@@ -123,7 +129,9 @@ const CourseWorkspace = () => {
                     <h1 className="text-xl font-bold line-clamp-1">{course.title}</h1>
                 </div>
                 <div className="text-sm text-gray-400 hidden sm:block">
-                    Progression : <span className="text-emerald-400 font-bold">{Math.round(((maxAccessibleIndex + (videoCompleted && currentVideoIndex === videos.length - 1 ? 1 : 0)) / videos.length) * 100)}%</span>
+                    Progression : <span className="text-emerald-400 font-bold">
+                        {Math.round(((maxAccessibleIndex + (videoCompleted && currentVideoIndex === videos.length - 1 ? 1 : 0)) / videos.length) * 100)}%
+                    </span>
                 </div>
             </header>
 
@@ -137,21 +145,16 @@ const CourseWorkspace = () => {
                             key={currentVideo.id}
                             controls
                             controlsList="nodownload"
-                            onEnded={() => {
-                                setVideoCompleted(true);
-                                if (currentVideoIndex + 1 > maxAccessibleIndex && currentVideoIndex + 1 < videos.length) {
-                                    setMaxAccessibleIndex(currentVideoIndex + 1);
-                                }
-                            }}
+                            onEnded={handleVideoEnd}
                             className="w-full h-full object-contain"
                             autoPlay
                         >
-                            <source src={`http://localhost:8000/storage/${currentVideo.file}`} type="video/mp4" />
+                            <source src={`${STORAGE_BASE_URL}/storage/${currentVideo.file}`} type="video/mp4" />
                             Votre navigateur ne supporte pas les vidéos HTML5.
                         </video>
                     </div>
 
-                    {/* Titre et détails de la vidéo sous le lecteur */}
+                    {/* Titre et détails de la vidéo */}
                     <div className="w-full max-w-4xl mt-4 px-2">
                         <h2 className="text-xl font-semibold text-gray-100">{currentVideo.title}</h2>
                         <div className="mt-2 flex items-center space-x-2">
@@ -173,7 +176,7 @@ const CourseWorkspace = () => {
                     </div>
                 </div>
 
-                {/* Barre latérale droite (Liste des chapitres) */}
+                {/* Barre latérale droite (Chapitres) */}
                 <div className="w-full md:w-80 bg-gray-800 border-t md:border-t-0 md:border-l border-gray-700 overflow-y-auto flex flex-col">
                     <div className="p-4 border-b border-gray-700 font-semibold text-gray-300 shadow-sm bg-gray-800/50 sticky top-0 backdrop-blur-sm z-10">
                         Contenu de la formation ({videos.length} chapitres)
@@ -195,12 +198,10 @@ const CourseWorkspace = () => {
                                         ${isLocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
                                     `}
                                 >
-                                    {/* Statut visuel */}
                                     <span className="mt-0.5 flex-shrink-0 text-base">
                                         {isLocked ? "🔒" : isDone ? "🟢" : "🔵"}
                                     </span>
 
-                                    {/* Infos textuelles */}
                                     <div className="flex-grow">
                                         <p className={`font-medium transition-colors ${isActive ? 'text-blue-300' : 'text-gray-200'}`}>
                                             {index + 1}. {video.title}
