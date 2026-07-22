@@ -24,7 +24,7 @@ export default function UpdateCourse() {
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        const response = await api.get(`/courses/${id}`);
+        const response = await api.get(`/course/${id}/edit`);
         const course = response.data.course || response.data;
 
         setData({
@@ -77,7 +77,7 @@ export default function UpdateCourse() {
     }
 
     try {
-      await api.post(`/courses/${id}`, formData, {
+      await api.post(`/course/${id}/edit`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
