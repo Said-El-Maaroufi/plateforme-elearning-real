@@ -1,62 +1,94 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import api from "../../api/axios"; // Importe ton instance Axios configurée
+import api from "../../api/axios"; 
+import { Cntx } from "../../context/context"; // Importation du contexte
 
 export default function UpdateCourse() {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  // 🔑 Récupération du token et du status de chargement depuis le Context
+  const { token, loading: contextLoading, user } = useContext(Cntx);
+
   // État du formulaire
   const [data, setData] = useState({
     title: "",
     description: "",
-    image: null, // Nouveau fichier binaire si sélectionné
+    image: null,
   });
 
   // États pour l'interface utilisateur
-  const [currentImage, setCurrentImage] = useState(null); // URL de l'image existante depuis Laravel
-  const [previewUrl, setPreviewUrl] = useState(null); // Prévisualisation de la nouvelle image sélectionnée
+  const [currentImage, setCurrentImage] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // 1. Récupérer les données du cours à modifier
+  // Protection de la page : Redirection si non connecté ou non admin
+  useEffect(() => {
+    if (contextLoading) return;
+
+    if (!token) {
+      alert("Accès refusé ! Veuillez vous connecter.");
+      navigate("/login");
+      return;
+    }
+
+    if (user && user.role !== "admin" && !user.is_admin) {
+      alert("Accès refusé ! Espace réservé aux administrateurs.");
+      navigate("/");
+    }
+  }, [token, contextLoading, user, navigate]);
+
+  // 1. Récupérer les données du cours avec le Token Sanctum
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        const response = await api.get(`/course/${id}/edit`);
-        const course = response.data.course || response.data;
-        setData({
-          title: course.title || "",
-          description: course.description || "",
-          image: null, // On garde null pour ne pas surcharger si pas de nouvelle image
+        const response = await api.get(`/course/${id}/edit`, {
+          headers: { 
+            Authorization: `Bearer ${token}` // ✅ Token envoyé ici
+          },
         });
 
-        // Récupérer le chemin de l'image existante
+        const course = response.data.course || response.data;
+
+        setData({
+          title: course.title || course.titre || "",
+          description: course.description || "",
+          image: null,
+        });
+
         if (course.image) {
           setCurrentImage(course.image);
         }
       } catch (err) {
         console.error("Erreur lors de la récupération du cours :", err);
-        alert("Impossible de charger les données du cours.");
+        if (err.response?.status === 401) {
+          alert("Session expirée. Veuillez vous reconnecter.");
+          navigate("/login");
+        } else {
+          alert("Impossible de charger les données du cours.");
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCourse();
-  }, [id]);
+    if (token) {
+      fetchCourse();
+    }
+  }, [id, token, navigate]);
 
   // 2. Gérer le changement d'image
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setData((prev) => ({ ...prev, image: file }));
-      setPreviewUrl(URL.createObjectURL(file)); // Crée une URL temporaire pour la prévisualisation
+      setPreviewUrl(URL.createObjectURL(file));
     }
   };
 
-  // 3. Soumettre les modifications à Laravel
+  // 3. Soumettre les modifications avec le Token Sanctum
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -66,11 +98,9 @@ export default function UpdateCourse() {
     formData.append("title", data.title);
     formData.append("description", data.description);
 
-    // Astro-astuce Laravel : PHP/Laravel ne lit pas 'multipart/form-data' lors d'une vraie requête PUT.
-    // On fait donc un POST avec le champ _method: "PUT"
+    // Simulation de PUT pour multipart/form-data
     formData.append("_method", "PUT");
 
-    // N'ajouter l'image au FormData que si un nouveau fichier a été sélectionné
     if (data.image) {
       formData.append("image", data.image);
     }
@@ -79,13 +109,20 @@ export default function UpdateCourse() {
       await api.post(`/course/${id}/edit`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`, // ✅ Token envoyé ici aussi
         },
       });
 
       alert("Le cours a été mis à jour avec succès !");
-      navigate("/cours"); // Redirection vers la liste
+      navigate("/cours");
     } catch (err) {
       console.error("Erreur de mise à jour :", err);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        alert("Action non autorisée ou session expirée.");
+        navigate("/login");
+        return;
+      }
+
       if (err.response && err.response.data && err.response.data.errors) {
         setErrors(err.response.data.errors);
       } else {
@@ -96,15 +133,13 @@ export default function UpdateCourse() {
     }
   };
 
-  // Fonction utilitaire pour générer l'URL complète d'une image stockée dans storage
   const getStorageUrl = (path) => {
     if (!path) return "";
     if (path.startsWith("http")) return path;
-    // URL de base Render sans le /api de la fin
     return `https://learnhub-backend-07qn.onrender.com/storage/${path}`;
   };
 
-  if (loading) {
+  if (contextLoading || loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <p className="text-slate-600 font-medium">Chargement des données du cours...</p>
@@ -168,7 +203,6 @@ export default function UpdateCourse() {
             Image de couverture
           </label>
 
-          {/* Zone d'affichage / prévisualisation de l'image */}
           <div className="flex items-center gap-4 mb-3">
             {previewUrl ? (
               <div>
@@ -197,7 +231,6 @@ export default function UpdateCourse() {
             )}
           </div>
 
-          {/* Champ d'upload */}
           <input
             type="file"
             accept="image/*"
