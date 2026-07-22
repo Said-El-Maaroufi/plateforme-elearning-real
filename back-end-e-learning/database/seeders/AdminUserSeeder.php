@@ -15,14 +15,14 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         //
-        User::create([
-            'name' => 'configuration admin',
-            'email' => 'exemple@gmail.com',
-            'password' => Hash::make('Exemple.@2026'),
-            'role' => 'admin',
-            'access' => true
-
-        ]);
+        User::firstOrCreate(
+            ['email' => 'admin@gmail.com'], // Condition de vérification
+            [
+                'name' => 'Admin',
+                'password' => Hash::make('Admin1234'), // Change ce mot de passe
+                'role' => 'admin', // Si tu as une colonne role dans ta table users
+            ]
+        );
 
             
     }
